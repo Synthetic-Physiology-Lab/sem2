@@ -13,8 +13,6 @@
  * - grow registered cells to proper size
  * - equilibrate for a bit
  * - switch to migration
- *
- *  Edited by Sandipan on 28/06/2023
  * ++++++++++++++++++++++++++++++++++++++++++++++
  */
 
@@ -171,8 +169,8 @@ void FixSemPMN::init()
 	dtCell[i]=0.0;
 	ccCell[i]=CC_I; //@@@ maybe set to G0
 	// @@@ Sandipan changing functionality of codebase from proliferation to migration.. default is CP_P
-	cpCell[i]=CP_P;
-	//cpCell[i]=CP_Q;
+	//cpCell[i]=CP_P;
+	cpCell[i]=CP_Q;
 	// @@@ Sandipan change ends
 	nSceCellLoc[i]=0;
 	tyCellLoc[i]=0;
@@ -683,7 +681,9 @@ void FixSemPMN::createSceRandom()
 #ifdef __SEM_DEBUG__
     printf(" - Creating %d SCEs Random\n",nCreateSce);
 #endif
-
+    // Sandipan debugging starts
+    printf(" - Creating %d SCEs Random\n",nCreateSce);
+    // Sandipan debugging ends
     //INIT THINGS
     int me;
     MPI_Comm_rank(world,&me);
@@ -1845,11 +1845,80 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
     memory->create(selElemLoc,nSel*2,"fix/sem:selElemLoc");
     
     // init
-    for(int s=0;s<nSel;s++) selNSceLoc[s]=selNSceLoc[s+1]=0;
-    // count elements above/below threshold, randomly select one
+    // Sandipan change for migration direction starts *************
+    printf("Polarity before setting: %f %f %f: \n",polarity[0][0],polarity[0][1],polarity[0][2]);
+    float min_x=selCenter[0][0];
+    float max_x=selCenter[0][0];
+    float min_y=selCenter[0][1];
+    float max_y=selCenter[0][1];
+    float min_z=selCenter[0][2];
+    float max_z=selCenter[0][2];
+    float ax=0;
+    float ay=0;
+    float az=0;
     int nlocal = atom->nlocal;
     double ** x = atom->x;
     int * cell  = atom->cell;
+    for (int i=0;i<nlocal;i++){
+	for(int j=0;j<nSel;j++){
+	    if(cell[i]==selId[j]){
+		// calculate the minimum and maximum coordinates along each axis
+		polarity[j][0]=0.0;
+    		polarity[j][1]=0.0;
+    		polarity[j][2]=0.0;
+		if(x[i][0]<min_x){
+		    min_x=x[i][0];
+		}
+		if(x[i][0]>max_x){
+		    max_x=x[i][0];
+		}
+		if(x[i][1]<min_y){
+		    min_y=x[i][1];
+		}
+		if(x[i][1]>max_y){
+		    max_y=x[i][1];
+		}
+		if(x[i][2]<min_z){
+		    min_z=x[i][2];
+		}
+		if(x[i][2]>max_z){
+		    max_z=x[i][2];
+		}
+		
+	    }
+	}
+    }
+    ax= max_x-min_x;
+    ay= max_y-min_y;
+    az= max_z-min_z;
+    if(ax>ay and ax>az){
+       polarity[0][0]=1.0;
+    }
+    if(ay>az and ay>ax){
+       polarity[0][1]=1.0;
+    }
+    if(az>ax and az>ay){
+       polarity[0][2]=1.0;
+    }
+    printf("Polarity after setting: %f %f %f: \n",polarity[0][0],polarity[0][1],polarity[0][2]);
+    printf("Minimum x: %f \n",min_x);
+    printf("Maximum x: %f \n",max_x);
+    printf("Minimum y: %f \n",min_y);
+    printf("Maximum y: %f \n",max_y);
+    printf("Minimum z: %f \n",min_z);
+    printf("Maximum z: %f \n",max_z);
+    printf("ax: %f \n",ax);
+    printf("ay: %f \n",ay);
+    printf("az: %f \n",az);
+    // Sandipan change for migration direction ends   *************
+    
+    for(int s=0;s<nSel;s++) selNSceLoc[s]=selNSceLoc[s+1]=0;
+    // count elements above/below threshold, randomly select one
+    // Sandipan change starts
+    //int nlocal = atom->nlocal;
+    //double ** x = atom->x;
+    //int * cell  = atom->cell;
+    // Sandipan change ends
     int *cellpart = atom->cellpart;
     int * mask  = atom->mask;
     for(int i=0;i<nlocal;i++){
@@ -1874,7 +1943,7 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
     }
     //Broadcast it
     MPI_Bcast(selElemLoc, nSel*2, MPI_INT, 0, world);
-    
+   
 #ifdef __SEM_DEBUG__
     for(int s=0;s<nSel*2;s++){
 	printf("%d: SelElemLoc[%d] %d\n",me,s,selElemLoc[s]);
@@ -1883,12 +1952,11 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
 	printf("%d: SelNSceAll[%d] %d\n",me,s,selNSceAll[s]);
     }
 #endif
-    
+   
     //++++++++++++++++++
     // find Elements to consider on this CPU
     //++++++++++++++++++
     //allocate
-    
     
     int nSelLoc[2];
     nSelLoc[0]=nSelLoc[1]=0;
@@ -1909,7 +1977,6 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
     int cnt0,cnt1;
     cnt0=0;
     cnt1=0;
-    
     int * selIndDepolyLoc, * selIndPolyLoc;
     memory->create(selIndDepolyLoc,nSelLoc[0],"fix/sem:selIndDepolyLoc");
     memory->create(selIndPolyLoc,nSelLoc[1],"fix/sem:selIndPolyLoc");
@@ -1934,6 +2001,7 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
 #endif
 
     
+      
     //++++++++++++++++++
     // HANDLE POLY
     // create new particles locally
@@ -2083,6 +2151,7 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
     memory->destroy(selElemLoc);
     memory->destroy(selIndPolyLoc);
     memory->destroy(selIndDepolyLoc);
+    
 }
 /* ----------------------------------------------------------------------
  tag membrane
