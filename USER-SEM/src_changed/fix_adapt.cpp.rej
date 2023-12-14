@@ -1,0 +1,29 @@
+--- fix_adapt.cpp	2021-03-24 13:25:26.929470596 +0530
++++ fix_adapt.cpp	2021-03-24 13:25:26.941470904 +0530
+@@ -35,7 +35,9 @@
+ using namespace MathConst;
+ 
+ enum{PAIR,KSPACE,ATOM};
+-enum{DIAMETER,CHARGE};
++enum{DIAMETER,CHARGE
++    //@@@SEM
++    ,POLYMERIZATION};
+ 
+ /* ---------------------------------------------------------------------- */
+ 
+@@ -119,7 +122,14 @@
+       } else if (strcmp(arg[iarg+1],"charge") == 0) {
+         adapt[nadapt].aparam = CHARGE; 
+         chgflag = 1; 
+-      } else error->all(FLERR,"Illegal fix adapt command");
++      } 
++      //@@@SEM
++      else if (strcmp(arg[iarg+1],"p") == 0){
++        adapt[nadapt].aparam = POLYMERIZATION;
++        polyflag = 1;
++      }
++      //@@@SEM-END
++        else error->all(FLERR,"Illegal fix adapt command");
+       if (strstr(arg[iarg+2],"v_") == arg[iarg+2]) {
+         int n = strlen(&arg[iarg+2][2]) + 1;
+         adapt[nadapt].var = new char[n];

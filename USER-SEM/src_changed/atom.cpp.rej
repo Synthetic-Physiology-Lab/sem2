@@ -1,0 +1,26 @@
+--- atom.cpp	2021-03-24 13:25:26.929470596 +0530
++++ atom.cpp	2021-03-24 13:25:26.933470699 +0530
+@@ -113,6 +113,12 @@
+   num_improper = NULL;
+   improper_type = NULL;
+   improper_atom1 = improper_atom2 = improper_atom3 = improper_atom4 = NULL;
++  
++  //@@@SEM
++  cell = NULL;
++  cellpart = NULL;
++  p = NULL;
++  dens = NULL;
+ 
+   maxspecial = 1;
+   nspecial = NULL;
+@@ -148,6 +154,10 @@
+ 
+   rho_flag = e_flag = cv_flag = vest_flag = 0;
+ 
++  //@@@SEM
++  sem_flag=0;
++  semDens_flag=0;
++
+   // Peridynamic scale factor
+ 
+   pdscale = 1.0;
