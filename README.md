@@ -1,6 +1,7 @@
 # HOW TO CITE
 
-Chattaraj Sandipan, Pasqualini Francesco, SEM2: A computational framework for modeling cell and tissue mechanics with coarse-grained subcellular elements.
+Sandipan Chattaraj, Michelle Torre, Constanze Kalcher, Alexander Stukowski, Simone Morganti, Alessandro Reali, Francesco Pasqualini, “SEM2: Introducing mechanics in cell and tissue models using
+coarse-grained homogeneous particle dynamics”, APL Bioengineering, 7, 046118 (2023) 1-14, https://doi.org/10.1063/5.0166829
 
 # Instructions for Installation
 
