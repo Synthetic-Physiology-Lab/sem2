@@ -1,0 +1,63 @@
+#~~~~~~~~~~~~~~~~~~~~~~~~
+# one SCE cell
+# test sce atom type
+# test sce ext potential
+#~~~~~~~~~~~~~~~~~~~~~~~~
+
+#+++++++++++++++++++
+# INITIALIZATION
+#+++++++++++++++++++
+# units in um, ug, s
+units      cell
+dimension  3
+newton     off
+processors * * *
+boundary   m m m
+atom_style sem
+compute_modify thermo_temp dynamic yes
+
+#+++++++++++++++++++
+# PAIRWISE NEIGHBOUR LIST
+#+++++++++++++++++++
+neighbor      0.45235 bin
+neigh_modify  delay 5
+
+read_restart cellnuc_1000.restart
+mass          1 3.10172e-06
+
+#+++++++++++++++++++
+# DEFINE POTENTIALS
+#+++++++++++++++++++
+# hybrid SEM potential with 2 global cutoffs at 2.5*r_eq
+# args (semEMp)  = TYPE1 TYPE2 u0_intra u0_inter rho_intra rho_inter alpha_intra alpha_inter r_eq R_3d/r_eq cutoff
+# args (semNucM) = TYPE1 TYPE2 u0 rho alpha r_eq R_3d/r_eq n_sft cutoff
+pair_style    hybrid semEMp 4.5235 semNucM 7.3028
+pair_coeff    1 1 semEMp 47318.5 18927.4 2 2 2 2 1.8094 1.2 4.5235
+pair_coeff    1 2 semNucM 47318.5 2 2 1.8094 1.2 2.7793 7.3028
+pair_coeff    2 2 none
+
+#+++++++++++++++++++
+# DEFINE FIXES
+#+++++++++++++++++++
+# Do BD using Langevin fix for random fluctuations
+# args = T T tau rseed
+fix  1 all langevin 298 298 6.20343e-10 8645982
+# BD requires same tau as for Langevin
+fix  2 all bd 6.20343e-10
+# cell grown between walls (at EDGE of domain -> see region command)
+fix  3 all wall/lj93 zhi EDGE 13300.8 1.05397 2.10794 zlo EDGE 13300.8 1.05397 2.10794
+fix  4 all indent 2.47887e+06 cylinder z 0 0 8.90671 side in
+
+#+++++++++++++++++++
+# RUN IT
+#+++++++++++++++++++
+timestep 0.001
+thermo 10000
+# dump every 5000 steps with custom dump type
+dump 1 all xyzSemEM 10000 cellnuc1000p.xyz
+run 1000000
+
+#+++++++++++++++++++
+# STORE RESTART AND DO DIAGS
+#+++++++++++++++++++
+write_restart cellnuc_1000p_equil.restart

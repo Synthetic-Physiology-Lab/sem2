@@ -1,0 +1,61 @@
+units      cell
+dimension  3
+newton     off
+processors * * *
+boundary   m m m
+atom_style sem
+compute_modify thermo_temp dynamic yes
+neighbor      0.45235 bin
+neigh_modify  delay 5
+lattice       diamond 1
+read_restart  cell_1000p_equil_298K.restart
+reset_timestep 0
+pair_style    semextp 4.5235
+pair_coeff    1 1 47318.5 18927.4 2 2 2 2 1.8094
+
+compute max_bounds all reduce max x y z
+compute min_bounds all reduce min x y z
+
+fix  1 all langevin 298 298 6.20343e-10 6256098
+fix  2 all bd 6.20343e-10
+thermo_style custom step c_min_bounds[3] c_max_bounds[3]
+timestep 0.001
+run 0
+variable xlow equal (c_min_bounds[1]-1)
+variable ylow equal (c_min_bounds[2]-1)
+variable zlow equal (c_min_bounds[3]-1)
+variable zlow_upper equal (c_min_bounds[3]+1)
+variable xhigh equal (c_max_bounds[1]+1)
+variable yhigh equal (c_max_bounds[2]+1)
+variable zhigh equal (c_max_bounds[3]+1)
+variable zhigh_lower equal (c_max_bounds[3]-1)
+
+region top_block block ${xlow} ${xhigh} ${ylow} ${yhigh} ${zhigh_lower} ${zhigh}
+region bottom_block block ${xlow} ${xhigh} ${ylow} ${yhigh} ${zlow} ${zlow_upper}
+
+group top region top_block
+group bottom region bottom_block
+group center subtract all bottom top
+
+dump 1 bottom xyzCell 100 bottom.xyz
+dump 2 center xyzCell 100 centre.xyz
+dump 3 top xyzCell 100 top.xyz
+dump 4 all xyzCell 100 all.xyz
+
+thermo 100
+fix top_force top aveforce 0 0 0
+fix bottom_velocity bottom move linear 0 0 0
+thermo_style custom step c_min_bounds[3] c_max_bounds[3]
+run 10000
+variable zmin equal c_min_bounds[3]
+variable zmax equal c_max_bounds[3]
+variable zmin_ini equal ${zmin}
+variable zmax_ini equal ${zmax}
+variable lzi equal (${zmax_ini}-${zmin_ini})
+variable strain equal (c_max_bounds[3]-c_min_bounds[3]-v_lzi)/v_lzi
+thermo_style custom step c_min_bounds[3] c_max_bounds[3] v_strain v_lzi
+fix top_force top aveforce 0 0 15169.35
+run 7000
+
+fix top_force top aveforce 0 0 0
+run 14000

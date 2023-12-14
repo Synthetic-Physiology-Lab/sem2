@@ -1,0 +1,83 @@
+#~~~~~~~~~~~~~~~~~~~~~~~~
+# one SCE cell with a nucleus
+#~~~~~~~~~~~~~~~~~~~~~~~~
+
+#+++++++++++++++++++
+# INITIALIZATION
+#+++++++++++++++++++
+# units in um, ug, s
+units      cell
+dimension  3
+newton     off
+processors * * *
+boundary   m m m
+atom_style semEM
+compute_modify thermo_temp dynamic yes
+
+#+++++++++++++++++++
+# PAIRWISE NEIGHBOUR LIST
+#+++++++++++++++++++
+neighbor      0.45235 bin
+neigh_modify  delay 5
+
+#+++++++++++++++++++
+# CREATE GEOMETRY
+# - could also be read from file
+#   using read_date/read_restart
+# - here:
+#	- define lattice
+#	- define a region with id: box
+#	- create a simulation box from defined region
+#	- create 1 atom in box of type 1
+#	- assign cell ID  1 to atom
+#+++++++++++++++++++
+#lattice     diamond 1
+#region      boxReg block -7 7 -7 7 -8.29154 8.29154
+#create_box  2 boxReg
+#create_atoms  1 single 0 0 0
+#set           atom 1 cell 1
+read_restart  cell_1000p.restart
+mass          1 3.10172e-06
+mass          2 1.55086e-04
+group nucleus type 2
+timestep 0.001
+#+++++++++++++++++++
+# DEFINE POTENTIALS
+#+++++++++++++++++++
+# hybrid SEM potential with 2 global cutoffs at 2.5*r_eq
+# args (semEMp)  = TYPE1 TYPE2 u0_intra u0_inter rho_intra rho_inter alpha_intra alpha_inter r_eq R_3d/r_eq cutoff
+# args (semNucM) = TYPE1 TYPE2 u0 rho alpha r_eq R_3d/r_eq n_sft cutoff
+pair_style    hybrid semEMp 4.5235 semNucM 7.3541
+pair_coeff    1 1 semEMp 47318.5 18927.4 2 2 2 2 1.8094 5.5267 4.5235
+pair_coeff    1 2 semNucM 47318.5 2 2 1.8094 5.5267 2.8306 7.3541
+pair_coeff    2 2 none
+
+variable my_cell_id atom cell
+variable my_nuc atom "type==2"
+group cell_nuc dynamic all var my_nuc 
+compute cellchunk all chunk/atom v_my_cell_id
+compute cellcom all com/chunk cellchunk
+compute cellnucchunk cell_nuc chunk/atom v_my_cell_id
+compute cellnuccom cell_nuc com/chunk cellnucchunk
+compute glob1 cell_nuc global/atom c_cellchunk c_cellcom[*]
+compute glob2 cell_nuc global/atom c_cellnucchunk c_cellnuccom[*]
+variable fnucx atom 2*3.10172e-01*((c_glob1[1]-c_glob2[1])-vx*dt)/(dt*dt)
+variable fnucy atom 2*3.10172e-01*((c_glob1[2]-c_glob2[2])-vy*dt)/(dt*dt)
+variable fnucz atom 2*3.10172e-01*((c_glob1[3]-c_glob2[3])-vz*dt)/(dt*dt)
+
+#+++++++++++++++++++
+# DEFINE FIXES
+#+++++++++++++++++++
+# Do BD using Langevin fix for random fluctuations
+# args = T T tau rseed
+fix  1 all langevin 57943.7 57943.7 6.20343e-10 524352
+# BD requires same tau as for Langevin
+fix  2 all bd 6.20343e-10
+# args = Nevery nSCEperCell CP_P tG0 tGI tM1 tM2 polyPRamp CP_M polyMRamp CP_Q LISTOFcellID
+fix  3 all sem_PMN 1 1000 10 0 200 50 50 1 200 1 0 1
+fix 4 cell_nuc addforce v_fnucx v_fnucy v_fnucz
+
+thermo 1000
+dump 1 all xyzSemEM 1000 dumpGrowN.xyz
+
+run 100000
