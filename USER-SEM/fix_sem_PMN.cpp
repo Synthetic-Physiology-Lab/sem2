@@ -228,6 +228,7 @@ void FixSemPMN::init()
     polyNucGroupId=group->find("polynuc");
     polyNucGroupBitmask=group->bitmask[polyNucGroupId];
     
+    
     memory->destroy(nSceCellLoc);
     memory->destroy(tyCellLoc);
     memory->destroy(flag);
@@ -247,56 +248,9 @@ void FixSemPMN::final_integrate(){
 void FixSemPMN::end_of_step(){
     if (nevery == 0) return;
     if (update->ntimestep % nevery) return;
-    advanceCell();
-    //Sandipan change for putting nucleus at cell centre starts
-    //nuc_centre();
-    //Sandipan change for putting nucleus at cell centre ends
-    
+    advanceCell(); 
 }
 
-/* ----------------------------------------------------------------------
- Code change by Sandipan to add a bias velocity to the nuclear particles towards the cell centre
- ---------------------------------------------------------------------- */
-void FixSemPMN::nuc_centre(){
-    
-    int *cell=atom->cell;
-    int *cellpart=atom->cellpart;
-    int * type  = atom->type;
-    int nlocal = atom->nlocal;
-    double **selCenter;
-    int * selInd, * selId;
-    double **x = atom->x;
-    double **v = atom->v;
-    bool* bSel;
-    int cur=0;
-    for (int i=0;i<nCell;i++){
-        bCreateSce[i]=true;
-    	cur++;
-    }
-    bSel=bCreateSce;
-    memory->create(selCenter,nCell,3,"fix/sem:selCenter");
-    memory->create(selInd,nCell,"fix/sem:selInd");
-    memory->create(selId,nCell,"fix/sem:selId");
-    for(int i=0;i<nlocal;i++){
-	for(int s=0;s<nCell;s++){
-	  cellCenter(nCell,bSel,selCenter,selId,selInd);
-	  if(cellpart[i]==2 && cell[i]==selId[s]){
-	      double velx=(selCenter[s][0]-x[i][0])/(update->dt*2);
-	      double vely=(selCenter[s][1]-x[i][1])/(update->dt*2);
-	      double velz=(selCenter[s][2]-x[i][2])/(update->dt*2);
-	      v[i][0] = velx;
-	      v[i][1] = vely;
-	      v[i][2] = velz;
-	  }
-	}
-    }
-    memory->destroy(selCenter);
-    memory->destroy(selInd);
-    memory->destroy(selId);
-    
-    
-}
-// Code change by Sandipan ends
 
 /* ----------------------------------------------------------------------
  What to do before forces are calculated
@@ -351,7 +305,6 @@ void FixSemPMN::advanceCell(){
 	bPrepareMig[i]=false;
 	bMig[i]=false;
 	dtCell[i]+=update->dt*(double)nevery;
-	
 	switch (cpCell[i]){ // CELL PHENOTYPE CHECK
 	    case CP_Q: // QUIESCENT CELL
 		// do nothing...
@@ -457,7 +410,6 @@ void FixSemPMN::advanceCell(){
 	    default:
 		error->all(FLERR,"Illegal Cell Phenotype");
 	}
-	
     }
     
     //++++++++++++++++++++++++++++++++++
@@ -681,9 +633,9 @@ void FixSemPMN::createSceRandom()
 #ifdef __SEM_DEBUG__
     printf(" - Creating %d SCEs Random\n",nCreateSce);
 #endif
-    // Sandipan debugging starts
-    printf(" - Creating %d SCEs Random\n",nCreateSce);
-    // Sandipan debugging ends
+// Sandipan debugging
+printf(" - Creating %d SCEs Random\n",nCreateSce);
+// Sandipan debugging  
     //INIT THINGS
     int me;
     MPI_Comm_rank(world,&me);
@@ -917,6 +869,9 @@ void FixSemPMN::createSceRandom()
 #ifdef __SEM_DEBUG__
 	    printf("CREATED IT, cell id = %d %d %d \n",atom->cell[atom->nlocal-1],idCell[dupInd[i]],dupId[i]);
 #endif
+// Sandipan debugging starts
+printf("CREATED IT, cell id = %d %d %d \n",atom->cell[atom->nlocal-1],idCell[dupInd[i]],dupId[i]);
+// Sandipan debugging ends
 	    
 	}
 	
@@ -1037,6 +992,9 @@ void FixSemPMN::polymerizeSce(){
 	else if(mask[i] & polyMGroupBitmask){
 	    nPolymerizeSceLoc++;
 	    p[i]+=polyMInc;
+	    // @@@@ Sandipan debugging starts
+	    printf("Polymerization and Migration -- nPolymerizeSceLoc -- %d p[i] -- %f\n",nPolymerizeSceLoc,p[i]);
+	    // @@@@ Sandipan debugging ends
 	    if(p[i]>1.0){
 		p[i]=1.0;
 		mask[i]^=polyMGroupBitmask;
@@ -1046,9 +1004,15 @@ void FixSemPMN::polymerizeSce(){
 	// DEPOLYMERIZATION MIGRATION
 	else if(mask[i] & depolyMGroupBitmask){
 	    p[i]-=polyMInc;
+	    // @@@@ Sandipan debugging starts
+	    printf("Depolymerization and Migration -- p[i] -- %f\n",p[i]);
+	    // @@@@ Sandipan debugging ends
 	    if(p[i]<0.0){
 		//p[i]=0;
 		//mask[i]^=depolyMGroupBitmask;
+		// @@@@ Sandipan debugging starts
+		printf("inside if -- p[i] -- %f\n",p[i]);
+	        // @@@@ Sandipan debugging ends
 		nPolymerizeSceLoc--;
 		atom->avec->copy(atom->nlocal-1,i,0);
 		atom->nlocal--;
@@ -1141,93 +1105,30 @@ void FixSemPMN::prepareSplitNuc()
     int* type=atom->type;
     int* mask=atom->mask;
     double **x=atom->x;
+    // Sandipan debugging starts
+    printf("before natoms_previous\n");
+    // Sandipan debugging ends
     bigint natoms_previous = atom->natoms;
     int nlocal_previous = atom->nlocal;
-    // Sandipan change for putting nucleus at cell centre starts *************
-    //double delta1=5;
-    //double delta2=5;
-    //double **selCenter;
-    //double **dupnucx;
-    //int * selInd;
-    //int * selIndE;
-    //double (* selEv)[3][3];
-    //double (* selR)[3][3];
-    //double (* selEw)[3];
-    //memory->create(selCenter,nSel,3,"fix/sem:selCenter");
-    //memory->create(dupnucx,nSel,3,"fix/sem:dupnucx");
-    //memory->create(selInd,nSel,"fix/sem:selInd");
-    //memory->create(selR,nSel,"fix/sem:selR");
-    //memory->create(selEv,nSel,"fix/sem:selEv");
-    //memory->create(selEw,nSel,"fix/sem:selEw");
-    //memory->create(selIndE,nSel,"fix/sem:selIndE");
-    //+++++++++++++++++
-    // calculate Ev/Ew
-    //+++++++++++++++++
-    //for(int j=0;j<nSel;j++){
-        //eigen_decomposition(selR[j],selEv[j],selEw[j]);
-	// largest eigenvalue
-	
-	// DIVIDE perp to Max EW
-	//int ind=(fabs(selEw[j][1])>fabs(selEw[j][0]))?1:0;
-	//selIndE[j]=(fabs(selEw[j][2])>fabs(selEw[j][ind]))?2:ind;
-	//printf("Ew: %f, %f, %f\n",selEw[j][0],selEw[j][1],selEw[j][2]);
-	//printf("index: %d\n",selIndE[j]);
-	//printf("Eigen index of the cell[%d]: %d\n",j,selIndE[j]);
-	
-    //}
-    // Sandipan change for putting nucleus at cell centre ends   *************
-    
+    // Sandipan debugging starts
+    printf("prepareSplitNuc before for %d \n",nlocal_previous);
+    int sandipan_tracker=0;
+    // Sandipan debugging ends
     for(int i=0;i<nlocal_previous;i++){
-        for(int j=0;j<nSel;j++){
+	for(int j=0;j<nSel;j++){
+	// Sandipan debugging starts
+	sandipan_tracker++;
+	//printf("duplication1 %d %d %d %d\n",cellpart[i],type[i],(cell[i]==selId[j]),sandipan_tracker);
+	 //  ***** Using type instead of cellpart to identify nucleus ******
 	    if(cellpart[i]==2 && cell[i]==selId[j]){
-	        // Sandipan change for putting nucleus at cell centre starts *************
-	    	//cellCenter(nSel,bSel,selCenter,selId,selInd);
-	    	//selIndE[j]=0; // Cell will divide along x axis for the time being
-	    	//if(selIndE[j]==0){
-	    	    //x[i][0]=selCenter[j][0]-delta1;
-	    	    //dupnucx[j][0]=selCenter[j][0]+delta2;
-	    	    //x[i][1]=selCenter[j][1];
-	    	    //dupnucx[j][1]=selCenter[j][1];
-	    	    //x[i][2]=selCenter[j][2];
-	    	    //dupnucx[j][2]=selCenter[j][2];
-	    	    //x[i][0]=x[i][0]-delta1;
-	    	    //dupnucx[j][0]=x[i][0]+delta2;
-	    	    //x[i][1]=x[i][1];
-	    	    //dupnucx[j][1]=x[i][1];
-	    	    //x[i][2]=x[i][2];
-	    	    //dupnucx[j][2]=x[i][2];
-	    	//}else if(selIndE[j]==1){
-	    	    //x[i][0]=selCenter[j][0];
-	    	    //dupnucx[j][0]=selCenter[j][0];
-	    	    //x[i][1]=selCenter[j][1]-delta1;
-	    	    //dupnucx[j][1]=selCenter[j][1]+delta2;
-	    	    //x[i][2]=selCenter[j][2];
-	    	    //dupnucx[j][2]=selCenter[j][2];
-	    	    //x[i][0]=x[i][0];
-	    	    //dupnucx[j][0]=x[i][0];
-	    	    //x[i][1]=x[i][1]-delta1;
-	    	    //dupnucx[j][1]=x[i][1]+delta2;
-	    	    //x[i][2]=x[i][2];
-	    	    //dupnucx[j][2]=x[i][2];
-	    	//}else{
-	    	    //x[i][0]=selCenter[j][0];
-	    	    //dupnucx[j][0]=selCenter[j][0];
-	    	    //x[i][1]=selCenter[j][1];
-	    	    //dupnucx[j][1]=selCenter[j][1];
-	    	    //x[i][2]=selCenter[j][2]-delta1;
-	    	    //dupnucx[j][2]=selCenter[j][2]+delta2;
-	    	    //x[i][0]=x[i][0];
-	    	    //dupnucx[j][0]=x[i][0];
-	    	    //x[i][1]=x[i][1];
-	    	    //dupnucx[j][1]=x[i][1];
-	    	    //x[i][2]=x[i][2]-delta1;
-	    	    //dupnucx[j][2]=x[i][2]+delta2;
-	    	//}
-	    	//atom->avec->create_atom(type[i],dupnucx[j]);
-	    	// Sandipan change for putting nucleus at cell centre ends   *************
-	    	
-	    	atom->avec->create_atom(type[i],x[i]);// Originally uncommented, commented after Sandipan's change
-	    	atom->cell[atom->nlocal-1]=cell[i];
+	    //if(type[i]==2 && cell[i]==selId[j]){
+		// duplicate the nucleus element
+		
+		//printf("duplication\n");
+		//printf("duplication2 %d \n",type[i]);
+		// Sandipan debugging ends
+		atom->avec->create_atom(type[i],x[i]);
+		atom->cell[atom->nlocal-1]=cell[i];
 		atom->cellpart[atom->nlocal-1]=3;
 		atom->p[atom->nlocal-1]=0.0;
 		atom->mask[atom->nlocal-1] |= polyNucGroupBitmask;
@@ -1236,16 +1137,7 @@ void FixSemPMN::prepareSplitNuc()
 		atom->mask[i] |= polyNucGroupBitmask;
 	    }
 	}
-    }
-    // Sandipan change for putting nucleus at cell centre starts *************
-    //memory->destroy(selCenter);
-    //memory->destroy(dupnucx);
-    //memory->destroy(selInd);
-    //memory->destroy(selR);
-    //memory->destroy(selEv);
-    //memory->destroy(selEw);
-    //memory->destroy(selIndE);
-    // Sandipan change for putting nucleus at cell centre ends   *************
+    }	
     
     ////////++++++++++++++++++++++++++++ maybe move to dedicated routine +++++++
     
@@ -1805,9 +1697,9 @@ void FixSemPMN::migratePolarity(){
 #ifdef __SEM_DEBUG__
     printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
 #endif
-// Sandipan debugging starts
+// @@@@ Sandipan debugging
 printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
-//Sandipan debugging ends
+// @@@@ Sandipan debugging ends     
     tagMembrane();
     
     int me;
@@ -1845,80 +1737,11 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
     memory->create(selElemLoc,nSel*2,"fix/sem:selElemLoc");
     
     // init
-    // Sandipan change for migration direction starts *************
-    printf("Polarity before setting: %f %f %f: \n",polarity[0][0],polarity[0][1],polarity[0][2]);
-    float min_x=selCenter[0][0];
-    float max_x=selCenter[0][0];
-    float min_y=selCenter[0][1];
-    float max_y=selCenter[0][1];
-    float min_z=selCenter[0][2];
-    float max_z=selCenter[0][2];
-    float ax=0;
-    float ay=0;
-    float az=0;
+    for(int s=0;s<nSel;s++) selNSceLoc[s]=selNSceLoc[s+1]=0;
+    // count elements above/below threshold, randomly select one
     int nlocal = atom->nlocal;
     double ** x = atom->x;
     int * cell  = atom->cell;
-    for (int i=0;i<nlocal;i++){
-	for(int j=0;j<nSel;j++){
-	    if(cell[i]==selId[j]){
-		// calculate the minimum and maximum coordinates along each axis
-		polarity[j][0]=0.0;
-    		polarity[j][1]=0.0;
-    		polarity[j][2]=0.0;
-		if(x[i][0]<min_x){
-		    min_x=x[i][0];
-		}
-		if(x[i][0]>max_x){
-		    max_x=x[i][0];
-		}
-		if(x[i][1]<min_y){
-		    min_y=x[i][1];
-		}
-		if(x[i][1]>max_y){
-		    max_y=x[i][1];
-		}
-		if(x[i][2]<min_z){
-		    min_z=x[i][2];
-		}
-		if(x[i][2]>max_z){
-		    max_z=x[i][2];
-		}
-		
-	    }
-	}
-    }
-    ax= max_x-min_x;
-    ay= max_y-min_y;
-    az= max_z-min_z;
-    if(ax>ay and ax>az){
-       polarity[0][0]=1.0;
-    }
-    if(ay>az and ay>ax){
-       polarity[0][1]=1.0;
-    }
-    if(az>ax and az>ay){
-       polarity[0][2]=1.0;
-    }
-    printf("Polarity after setting: %f %f %f: \n",polarity[0][0],polarity[0][1],polarity[0][2]);
-    printf("Minimum x: %f \n",min_x);
-    printf("Maximum x: %f \n",max_x);
-    printf("Minimum y: %f \n",min_y);
-    printf("Maximum y: %f \n",max_y);
-    printf("Minimum z: %f \n",min_z);
-    printf("Maximum z: %f \n",max_z);
-    printf("ax: %f \n",ax);
-    printf("ay: %f \n",ay);
-    printf("az: %f \n",az);
-    // Sandipan change for migration direction ends   *************
-    
-    for(int s=0;s<nSel;s++) selNSceLoc[s]=selNSceLoc[s+1]=0;
-    // count elements above/below threshold, randomly select one
-    // Sandipan change starts
-    //int nlocal = atom->nlocal;
-    //double ** x = atom->x;
-    //int * cell  = atom->cell;
-    // Sandipan change ends
     int *cellpart = atom->cellpart;
     int * mask  = atom->mask;
     for(int i=0;i<nlocal;i++){
@@ -1926,8 +1749,7 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
 	    if(cell[i]==selId[s] && cellpart[i]==0){
 		double pol = (selCenter[s][0]-x[i][0])*polarity[selInd[s]][0]+
 		(selCenter[s][1]-x[i][1])*polarity[selInd[s]][1]+
-		//(selCenter[s][1]-x[i][2])*polarity[selInd[s]][2]; //**Changed by Sandipan
-		(selCenter[s][2]-x[i][2])*polarity[selInd[s]][2];
+		(selCenter[s][1]-x[i][2])*polarity[selInd[s]][2];
 		if(pol<=selPolThr[s])   selNSceLoc[s]++;
 		if(pol>=selPolThr[s+1]) selNSceLoc[s+1]++;
 	    }
@@ -1943,7 +1765,7 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
     }
     //Broadcast it
     MPI_Bcast(selElemLoc, nSel*2, MPI_INT, 0, world);
-   
+    
 #ifdef __SEM_DEBUG__
     for(int s=0;s<nSel*2;s++){
 	printf("%d: SelElemLoc[%d] %d\n",me,s,selElemLoc[s]);
@@ -1952,11 +1774,20 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
 	printf("%d: SelNSceAll[%d] %d\n",me,s,selNSceAll[s]);
     }
 #endif
-   
+// @@@@ Sandipan debugging
+	for(int s=0;s<nSel*2;s++){
+	printf("%d: SelElemLoc[%d] %d\n",me,s,selElemLoc[s]);
+	printf("%d: SelNSceLoc[%d] %d\n",me,s,selNSceLoc[s]);
+	printf("%d: SelNSceBefore[%d] %d\n",me,s,selNSceBefore[s]);
+	printf("%d: SelNSceAll[%d] %d\n",me,s,selNSceAll[s]);
+    }
+// @@@@ Sandipan debugging ends         
+    
     //++++++++++++++++++
     // find Elements to consider on this CPU
     //++++++++++++++++++
     //allocate
+    
     
     int nSelLoc[2];
     nSelLoc[0]=nSelLoc[1]=0;
@@ -1977,6 +1808,7 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
     int cnt0,cnt1;
     cnt0=0;
     cnt1=0;
+    
     int * selIndDepolyLoc, * selIndPolyLoc;
     memory->create(selIndDepolyLoc,nSelLoc[0],"fix/sem:selIndDepolyLoc");
     memory->create(selIndPolyLoc,nSelLoc[1],"fix/sem:selIndPolyLoc");
@@ -1999,9 +1831,16 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
 	printf("%d, Poly selIndPolyLoc[%d] %d\n",me,s,selIndPolyLoc[s]);
     }
 #endif
+// @@@@ Sandipan debugging
+for(int s=0;s<nSelLoc[0];s++){
+	printf("%d, Deoly selIndDeployLoc[%d] %d \n",me,s,selIndDepolyLoc[s]);
+    }
+    for(int s=0;s<nSelLoc[1];s++){
+	printf("%d, Poly selIndPolyLoc[%d] %d\n",me,s,selIndPolyLoc[s]);
+    }
+// @@@@ Sandipan debugging ends     
 
     
-      
     //++++++++++++++++++
     // HANDLE POLY
     // create new particles locally
@@ -2109,15 +1948,21 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
     if (atom->natoms < 0 || atom->natoms > MAXBIGINT)
 	error->all(FLERR,"Too many total atoms");
     
-        //printf("atoms: %d\n",atom->natoms); // @@@@ Sandipan uncommented
+        printf("atoms: %d\n",atom->natoms); // @@@@ Sandipan uncommented
     
     // set tag # of new particles beyond all previous atoms
     // if global map exists, reset it now instead of waiting for comm
     // since deleting atoms messes up ghosts
     if (atom->tag_enable) {
+        // @@@@ Sandipan debugging
+	printf("atom map style.........\n");
+	// @@@@ Sandipan debugging ends
       atom->tag_extend();
       if (atom->map_style) {
-        atom->nghost = 0;
+        // @@@@ Sandipan debugging
+	printf("atom map style.........\n");
+	// @@@@ Sandipan debugging ends   
+	atom->nghost = 0;
 	atom->map_init();
 	atom->map_set();
       }
@@ -2125,7 +1970,10 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
     
     // never invoced
     if (atom->molecular) {
-        int **nspecial = atom->nspecial;
+        // @@@@ Sandipan debugging
+	printf("atom molecular.........\n");
+	// @@@@ Sandipan debugging ends   
+	int **nspecial = atom->nspecial;
 	for (int i = nlocal_previous; i < atom->nlocal; i++) {
 	    nspecial[i][0] = 0;
 	    nspecial[i][1] = 0;
@@ -2137,6 +1985,9 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
     //needs neighbour must_check enabled!!!
     nPolymerizeSce+=nSel*2;
     next_reneighbor=update->ntimestep+1;
+// @@@@ Sandipan debugging
+printf("End of migratePolarity().........%d\n",nPolymerizeSce);
+// @@@@ Sandipan debugging ends    
     
     //++++++++++++++++++
     // DEALLOCATE THINGS
@@ -2151,7 +2002,6 @@ printf(" - Migrate %d Cells of %d Cells in total\n",nMig,nCell);
     memory->destroy(selElemLoc);
     memory->destroy(selIndPolyLoc);
     memory->destroy(selIndDepolyLoc);
-    
 }
 /* ----------------------------------------------------------------------
  tag membrane
@@ -2276,6 +2126,7 @@ void FixSemPMN::cellCenter(int nSel, bool *bSel, double ** selCenter, int *selId
     
     double **selCenterLoc;
     memory->create(selCenterLoc,nSel,3,"fix/sem:selCenterLoc");
+    
     int cur=0;
     for(int c=0;c<nCell;c++){
 	if(bSel[c]){
@@ -2287,6 +2138,7 @@ void FixSemPMN::cellCenter(int nSel, bool *bSel, double ** selCenter, int *selId
 	    cur++;
 	}
     }
+    
     // find centers of migrating 
     // accumulate locations localy
     int nlocal = atom->nlocal;
@@ -2313,7 +2165,7 @@ void FixSemPMN::cellCenter(int nSel, bool *bSel, double ** selCenter, int *selId
 	selCenter[i][1]/=(double)nSceCell[selInd[i]];
 	selCenter[i][2]/=(double)nSceCell[selInd[i]];
     }
-    
     memory->destroy(selCenterLoc);
     
 }
+
